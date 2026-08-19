@@ -1,0 +1,83 @@
+name: XH Scraper
+
+on:
+  workflow_dispatch:
+    inputs:
+      previous_run_id:
+        description: "Previous GitHub Actions run ID containing scraper state"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: xh-scraper-chain
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    # GitHub-hosted runners have a 6-hour maximum.
+    # Python scraper stops itself at 5.5 hours.
+    timeout-minutes: 360
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download previous scraper state
+        if: ${{ inputs.previous_run_id != '' }}
+        uses: actions/download-artifact@v5
+        with:
+          name: xh-scraper-state
+          path: .
+          run-id: ${{ inputs.previous_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r xh_requirements.txt
+
+      - name: Install Playwright Chromium
+        run: |
+          playwright install --with-deps chromium
+
+      - name: Run XH scraper
+        run: |
+          python xh_scraper.py
+
+      - name: Upload scraper state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xh-scraper-state
+          path: |
+            drdo_xinhua_dataset.csv
+            xh_scraper_complete.flag
+          if-no-files-found: ignore
+          retention-days: 2
+
+      - name: Start next scraper run
+        if: ${{ success() && !hashFiles('xh_scraper_complete.flag') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Current run: ${{ github.run_id }}"
+          echo "Scraper is not finished."
+          echo "Starting next GitHub Actions run..."
+
+          gh workflow run xh_scraper.yml \
+            --ref main \
+            -f previous_run_id=${{ github.run_id }}
+
+          echo "Next run queued successfully."
