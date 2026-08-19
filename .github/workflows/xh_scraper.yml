@@ -20,8 +20,8 @@ jobs:
   scrape:
     runs-on: ubuntu-latest
 
-    # GitHub-hosted runners have a 6-hour maximum.
-    # Python scraper stops itself at 5.5 hours.
+    # GitHub-hosted runner maximum is 6 hours.
+    # The Python scraper stops itself at 5.5 hours.
     timeout-minutes: 360
 
     steps:
