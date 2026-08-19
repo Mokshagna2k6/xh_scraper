@@ -50,7 +50,7 @@ jobs:
 
       - name: Install Playwright Chromium
         run: |
-          playwright install --with-deps chromium
+          playwright install chromium
 
       - name: Run XH scraper
         run: |
